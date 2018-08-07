@@ -26,6 +26,8 @@ def set_global(args):
     global tmp_include_dir
     global dst_include_dir
     global dst_lib_dir
+    global dst_bin_dir
+    global install_test_utils
     pkg_path = args["pkg_path"]
     output_dir = args["output_path"]
     tarball_pkg = ops.path_join(pkg_path, TARBALL_FILE)
@@ -37,32 +39,17 @@ def set_global(args):
     tmp_include_dir = ops.path_join(output_dir, ops.path_join("include",args["pkg_name"]))
     dst_include_dir = ops.path_join("include",args["pkg_name"])
     dst_lib_dir = ops.path_join(install_dir, "lib")
+    dst_bin_dir = ops.path_join(install_dir, "bin")
+    if ops.getEnv("INSTALL_TEST_UTILS") == 'y':
+        install_test_utils = True
+    else:
+        install_test_utils = False
 
 def MAIN_ENV(args):
     set_global(args)
 
-    ops.exportEnv(ops.setEnv("CC", ops.getEnv("CROSS_COMPILE") + "gcc"))
-    ops.exportEnv(ops.setEnv("CXX", ops.getEnv("CROSS_COMPILE") + "g++"))
-    ops.exportEnv(ops.setEnv("CROSS", ops.getEnv("CROSS_COMPILE")))
     ops.exportEnv(ops.setEnv("DESTDIR", install_tmp_dir))
-    ops.exportEnv(ops.setEnv("PKG_CONFIG_LIBDIR", ops.path_join(iopc.getSdkPath(), "pkgconfig")))
-    ops.exportEnv(ops.setEnv("PKG_CONFIG_SYSROOT_DIR", iopc.getSdkPath()))
-
-    cc_sysroot = ops.getEnv("CC_SYSROOT")
-    cflags = ""
-    cflags += " -I" + ops.path_join(cc_sysroot, 'usr/include')
-    #cflags += " -I" + ops.path_join(iopc.getSdkPath(), 'usr/include/libexpat')
-
-    ldflags = ""
-    ldflags += " -L" + ops.path_join(cc_sysroot, 'lib')
-    ldflags += " -L" + ops.path_join(cc_sysroot, 'usr/lib')
-    ldflags += " -L" + ops.path_join(iopc.getSdkPath(), 'lib')
-
-    libs = ""
-    libs += " -lffi -lxml2 -lexpat"
-    ops.exportEnv(ops.setEnv("LDFLAGS", ldflags))
-    ops.exportEnv(ops.setEnv("CFLAGS", cflags))
-    ops.exportEnv(ops.setEnv("LIBS", libs))
+    ops.exportEnv(ops.setEnv("SUPPORT_DRM", "y"))
 
     return False
 
@@ -89,19 +76,33 @@ def MAIN_CONFIGURE(args):
 
     extra_conf = []
     extra_conf.append("--host=" + cc_host)
-    extra_conf.append("--disable-intel")
-    extra_conf.append("--disable-radeon")
-    extra_conf.append("--disable-amdgpu")
-    extra_conf.append("--disable-nouveau")
-    extra_conf.append("--disable-vmwgfx")
-    extra_conf.append("--disable-freedreno")
-    extra_conf.append("--disable-vc4")
-    extra_conf.append('FFI_CFLAGS="-I' + ops.path_join(iopc.getSdkPath(), 'usr/include/libffi') + '"')
-    extra_conf.append('FFI_LIBS="-L' + ops.path_join(iopc.getSdkPath(), 'lib') + ' -lffi"')
-    extra_conf.append('EXPAT_CFLAGS="-I' + ops.path_join(iopc.getSdkPath(), 'usr/include/libexpat') + '"')
-    extra_conf.append('EXPAT_LIBS="-L' + ops.path_join(iopc.getSdkPath(), 'lib') + ' -lexpat"')
-    extra_conf.append('LIBXML_CFLAGS="-I' + ops.path_join(iopc.getSdkPath(), 'usr/include/libxml2') + '"')
-    extra_conf.append('LIBXML_LIBS="-L' + ops.path_join(iopc.getSdkPath(), 'lib') + ' -lxml2"')
+    extra_conf.append("--enable-intel")
+    extra_conf.append("--enable-radeon")
+    extra_conf.append("--enable-amdgpu")
+    extra_conf.append("--enable-nouveau")
+    extra_conf.append("--enable-vmwgfx")
+    extra_conf.append("--enable-freedreno")
+    extra_conf.append("--enable-vc4")
+    if install_test_utils:
+        extra_conf.append("--enable-install-test-programs")
+
+    cflags = ""
+    cflags += " -I" + ops.path_join(iopc.getSdkPath(), 'usr/include/libffi')
+    cflags += " -I" + ops.path_join(iopc.getSdkPath(), 'usr/include/libexpat')
+    cflags += " -I" + ops.path_join(iopc.getSdkPath(), 'usr/include/libxml2')
+    cflags += " -I" + ops.path_join(iopc.getSdkPath(), 'usr/include/libpciaccess')
+
+    libs = ""
+    libs += " -L" + ops.path_join(iopc.getSdkPath(), 'lib')
+    libs += " -lffi -lexpat -lxml2 -lpciaccess"
+    extra_conf.append('FFI_CFLAGS=' + cflags)
+    extra_conf.append('FFI_LIBS=' + libs)
+    extra_conf.append('EXPAT_CFLAGS=' + cflags)
+    extra_conf.append('EXPAT_LIBS=' + libs)
+    extra_conf.append('LIBXML_CFLAGS=' + cflags)
+    extra_conf.append('LIBXML_LIBS=' + libs)
+    extra_conf.append('PCIACCESS_CFLAGS=' + cflags)
+    extra_conf.append('PCIACCESS_LIBS=' + libs)
     iopc.configure(tarball_dir, extra_conf)
 
     return True
@@ -128,8 +129,49 @@ def MAIN_BUILD(args):
     ops.ln(dst_lib_dir, libkms, "libkms.so.1")
     ops.ln(dst_lib_dir, libkms, "libkms.so")
 
+    libdrm_amdgpu = "libdrm_amdgpu.so.1.0.0"
+    ops.copyto(ops.path_join(install_tmp_dir, "usr/local/lib/" + libdrm_amdgpu), dst_lib_dir)
+    ops.ln(dst_lib_dir, libdrm_amdgpu, "libdrm_amdgpu.so.1.0")
+    ops.ln(dst_lib_dir, libdrm_amdgpu, "libdrm_amdgpu.so.1")
+    ops.ln(dst_lib_dir, libdrm_amdgpu, "libdrm_amdgpu.so")
+
+    libdrm_freedreno = "libdrm_freedreno.so.1.0.0"
+    ops.copyto(ops.path_join(install_tmp_dir, "usr/local/lib/" + libdrm_freedreno), dst_lib_dir)
+    ops.ln(dst_lib_dir, libdrm_freedreno, "libdrm_freedreno.so.1.0")
+    ops.ln(dst_lib_dir, libdrm_freedreno, "libdrm_freedreno.so.1")
+    ops.ln(dst_lib_dir, libdrm_freedreno, "libdrm_freedreno.so")
+
+    libdrm_intel = "libdrm_intel.so.1.0.0"
+    ops.copyto(ops.path_join(install_tmp_dir, "usr/local/lib/" + libdrm_intel), dst_lib_dir)
+    ops.ln(dst_lib_dir, libdrm_intel, "libdrm_intel.so.1.0")
+    ops.ln(dst_lib_dir, libdrm_intel, "libdrm_intel.so.1")
+    ops.ln(dst_lib_dir, libdrm_intel, "libdrm_intel.so")
+
+    libdrm_nouveau = "libdrm_nouveau.so.2.0.0"
+    ops.copyto(ops.path_join(install_tmp_dir, "usr/local/lib/" + libdrm_nouveau), dst_lib_dir)
+    ops.ln(dst_lib_dir, libdrm_nouveau, "libdrm_nouveau.so.2.0")
+    ops.ln(dst_lib_dir, libdrm_nouveau, "libdrm_nouveau.so.2")
+    ops.ln(dst_lib_dir, libdrm_nouveau, "libdrm_nouveau.so")
+
+    libdrm_radeon = "libdrm_radeon.so.1.0.1"
+    ops.copyto(ops.path_join(install_tmp_dir, "usr/local/lib/" + libdrm_radeon), dst_lib_dir)
+    ops.ln(dst_lib_dir, libdrm_radeon, "libdrm_radeon.so.1.0")
+    ops.ln(dst_lib_dir, libdrm_radeon, "libdrm_radeon.so.1")
+    ops.ln(dst_lib_dir, libdrm_radeon, "libdrm_radeon.so")
+
     ops.mkdir(tmp_include_dir)
     ops.copyto(ops.path_join(install_tmp_dir, "usr/local/include/."), tmp_include_dir)
+
+
+    if install_test_utils:
+        ops.mkdir(dst_bin_dir)
+        ops.copyto(ops.path_join(install_tmp_dir, "usr/local/bin/kms-steal-crtc"), dst_bin_dir)
+        ops.copyto(ops.path_join(install_tmp_dir, "usr/local/bin/kmstest"), dst_bin_dir)
+        ops.copyto(ops.path_join(install_tmp_dir, "usr/local/bin/kms-universal-planes"), dst_bin_dir)
+        ops.copyto(ops.path_join(install_tmp_dir, "usr/local/bin/modeprint"), dst_bin_dir)
+        ops.copyto(ops.path_join(install_tmp_dir, "usr/local/bin/modetest"), dst_bin_dir)
+        ops.copyto(ops.path_join(install_tmp_dir, "usr/local/bin/proptest"), dst_bin_dir)
+        ops.copyto(ops.path_join(install_tmp_dir, "usr/local/bin/vbltest"), dst_bin_dir)
     return False
 
 def MAIN_INSTALL(args):
@@ -137,6 +179,8 @@ def MAIN_INSTALL(args):
 
     iopc.installBin(args["pkg_name"], ops.path_join(ops.path_join(install_dir, "lib"), "."), "lib")
     iopc.installBin(args["pkg_name"], ops.path_join(tmp_include_dir, "."), dst_include_dir)
+    if install_test_utils:
+        iopc.installBin(args["pkg_name"], ops.path_join(ops.path_join(install_dir, "bin"), "."), "bin")
 
     return False
 
