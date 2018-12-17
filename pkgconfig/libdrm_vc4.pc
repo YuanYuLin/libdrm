@@ -1,0 +1,9 @@
+prefix={{SDKSTAGE}}
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include/libdrm
+
+Name: libdrm_vc4
+Description: Userspace interface to vc4 kernel DRM services
+Version: 2.4.91
+Requires.private: libdrm

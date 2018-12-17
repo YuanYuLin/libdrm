@@ -28,6 +28,8 @@ def set_global(args):
     global dst_lib_dir
     global dst_bin_dir
     global install_test_utils
+    global src_pkgconfig_dir
+    global dst_pkgconfig_dir
     pkg_path = args["pkg_path"]
     output_dir = args["output_path"]
     tarball_pkg = ops.path_join(pkg_path, TARBALL_FILE)
@@ -40,6 +42,8 @@ def set_global(args):
     dst_include_dir = ops.path_join("include",args["pkg_name"])
     dst_lib_dir = ops.path_join(install_dir, "lib")
     dst_bin_dir = ops.path_join(install_dir, "bin")
+    src_pkgconfig_dir = ops.path_join(pkg_path, "pkgconfig")
+    dst_pkgconfig_dir = ops.path_join(install_dir, "pkgconfig")
     if ops.getEnv("INSTALL_TEST_UTILS") == 'y':
         install_test_utils = True
     else:
@@ -74,6 +78,9 @@ def MAIN_PATCH(args, patch_group_name):
 def MAIN_CONFIGURE(args):
     set_global(args)
 
+    cflags = iopc.get_includes()
+    libs = iopc.get_libs()
+
     extra_conf = []
     extra_conf.append("--host=" + cc_host)
     extra_conf.append("--enable-intel")
@@ -86,15 +93,6 @@ def MAIN_CONFIGURE(args):
     if install_test_utils:
         extra_conf.append("--enable-install-test-programs")
 
-    cflags = ""
-    cflags += " -I" + ops.path_join(iopc.getSdkPath(), 'usr/include/libffi')
-    cflags += " -I" + ops.path_join(iopc.getSdkPath(), 'usr/include/libexpat')
-    cflags += " -I" + ops.path_join(iopc.getSdkPath(), 'usr/include/libxml2')
-    cflags += " -I" + ops.path_join(iopc.getSdkPath(), 'usr/include/libpciaccess')
-
-    libs = ""
-    libs += " -L" + ops.path_join(iopc.getSdkPath(), 'lib')
-    libs += " -lffi -lexpat -lxml2 -lpciaccess"
     extra_conf.append('FFI_CFLAGS=' + cflags)
     extra_conf.append('FFI_LIBS=' + libs)
     extra_conf.append('EXPAT_CFLAGS=' + cflags)
@@ -162,6 +160,8 @@ def MAIN_BUILD(args):
     ops.mkdir(tmp_include_dir)
     ops.copyto(ops.path_join(install_tmp_dir, "usr/local/include/."), tmp_include_dir)
 
+    ops.mkdir(dst_pkgconfig_dir)
+    ops.copyto(ops.path_join(src_pkgconfig_dir, '.'), dst_pkgconfig_dir)
 
     if install_test_utils:
         ops.mkdir(dst_bin_dir)
@@ -172,15 +172,31 @@ def MAIN_BUILD(args):
         ops.copyto(ops.path_join(install_tmp_dir, "usr/local/bin/modetest"), dst_bin_dir)
         ops.copyto(ops.path_join(install_tmp_dir, "usr/local/bin/proptest"), dst_bin_dir)
         ops.copyto(ops.path_join(install_tmp_dir, "usr/local/bin/vbltest"), dst_bin_dir)
-    return False
+    return True
 
 def MAIN_INSTALL(args):
     set_global(args)
 
     iopc.installBin(args["pkg_name"], ops.path_join(ops.path_join(install_dir, "lib"), "."), "lib")
     iopc.installBin(args["pkg_name"], ops.path_join(tmp_include_dir, "."), dst_include_dir)
+    iopc.installBin(args["pkg_name"], ops.path_join(dst_pkgconfig_dir, '.'), "pkgconfig")
     if install_test_utils:
         iopc.installBin(args["pkg_name"], ops.path_join(ops.path_join(install_dir, "bin"), "."), "bin")
+
+    return False
+
+def MAIN_SDKENV(args):
+    set_global(args)
+
+    pkgsdk_include_dir=ops.path_join(iopc.getSdkPath(), 'usr/include/' + args["pkg_name"])
+    cflags = ""
+    cflags += " -I" + pkgsdk_include_dir
+    cflags += " -I" + ops.path_join(pkgsdk_include_dir, "libdrm")
+    iopc.add_includes(cflags)
+
+    libs = ""
+    libs += " -ldrm -lkms -ldrm_amdgpu -ldrm_freedreno -ldrm_intel -ldrm_nouveau -ldrm_radeon"
+    iopc.add_libs(libs)
 
     return False
 

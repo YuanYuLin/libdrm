@@ -1,0 +1,11 @@
+prefix={{SDKSTAGE}}
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include/libdrm
+
+Name: libdrm_nouveau
+Description: Userspace interface to nouveau kernel DRM services
+Version: 2.4.91
+Libs: -L${libdir} -ldrm_nouveau
+Cflags: -I${includedir} -I${includedir}/libdrm -I${includedir}/libdrm/nouveau
+Requires.private: libdrm

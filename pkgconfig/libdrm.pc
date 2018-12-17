@@ -1,0 +1,10 @@
+prefix={{SDKSTAGE}}
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include/libdrm
+
+Name: libdrm
+Description: Userspace interface to kernel DRM services
+Version: 2.4.91
+Libs: -L${libdir} -ldrm
+Cflags: -I${includedir} -I${includedir}/libdrm
