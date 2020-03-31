@@ -30,6 +30,8 @@ def set_global(args):
     global install_test_utils
     global src_pkgconfig_dir
     global dst_pkgconfig_dir
+    global selected_platform_panda
+    global selected_platform_j3455
     pkg_path = args["pkg_path"]
     output_dir = args["output_path"]
     tarball_pkg = ops.path_join(pkg_path, TARBALL_FILE)
@@ -48,6 +50,9 @@ def set_global(args):
         install_test_utils = True
     else:
         install_test_utils = False
+
+    selected_platform_panda=False
+    selected_platform_j3455=True
 
 def MAIN_ENV(args):
     set_global(args)
@@ -83,24 +88,40 @@ def MAIN_CONFIGURE(args):
 
     extra_conf = []
     extra_conf.append("--host=" + cc_host)
-    extra_conf.append("--enable-intel")
-    extra_conf.append("--enable-radeon")
-    extra_conf.append("--enable-amdgpu")
-    extra_conf.append("--enable-nouveau")
-    extra_conf.append("--enable-vmwgfx")
-    extra_conf.append("--enable-freedreno")
-    extra_conf.append("--enable-vc4")
     if install_test_utils:
         extra_conf.append("--enable-install-test-programs")
 
-    extra_conf.append('FFI_CFLAGS=' + cflags)
-    extra_conf.append('FFI_LIBS=' + libs)
-    extra_conf.append('EXPAT_CFLAGS=' + cflags)
-    extra_conf.append('EXPAT_LIBS=' + libs)
-    extra_conf.append('LIBXML_CFLAGS=' + cflags)
-    extra_conf.append('LIBXML_LIBS=' + libs)
-    extra_conf.append('PCIACCESS_CFLAGS=' + cflags)
-    extra_conf.append('PCIACCESS_LIBS=' + libs)
+    if selected_platform_panda :
+        extra_conf.append("--disable-intel")
+        extra_conf.append("--disable-radeon")
+        extra_conf.append("--disable-amdgpu")
+        extra_conf.append("--disable-nouveau")
+        extra_conf.append("--disable-vmwgfx")
+        extra_conf.append("--disable-freedreno")
+        extra_conf.append("--disable-vc4")
+        extra_conf.append("--enable-omap")
+        extra_conf.append("--disable-cairo-tests")
+
+    if selected_platform_j3455 :
+        extra_conf.append("--enable-intel")
+        extra_conf.append("--enable-radeon")
+        extra_conf.append("--enable-amdgpu")
+        extra_conf.append("--enable-nouveau")
+        extra_conf.append("--enable-vmwgfx")
+        extra_conf.append("--disable-freedreno")
+        extra_conf.append("--disable-vc4")
+        extra_conf.append("--disable-omap")
+        extra_conf.append("--disable-cairo-tests")
+
+        extra_conf.append('FFI_CFLAGS=' + cflags)
+        extra_conf.append('FFI_LIBS=' + libs)
+        extra_conf.append('EXPAT_CFLAGS=' + cflags)
+        extra_conf.append('EXPAT_LIBS=' + libs)
+        extra_conf.append('LIBXML_CFLAGS=' + cflags)
+        extra_conf.append('LIBXML_LIBS=' + libs)
+        extra_conf.append('PCIACCESS_CFLAGS=' + cflags)
+        extra_conf.append('PCIACCESS_LIBS=' + libs)
+
     iopc.configure(tarball_dir, extra_conf)
 
     return True
@@ -115,47 +136,53 @@ def MAIN_BUILD(args):
 
     ops.mkdir(install_dir)
     ops.mkdir(dst_lib_dir)
-    libdrm = "libdrm.so.2.4.0"
-    ops.copyto(ops.path_join(install_tmp_dir, "usr/local/lib/" + libdrm), dst_lib_dir)
-    ops.ln(dst_lib_dir, libdrm, "libdrm.so.2.4")
-    ops.ln(dst_lib_dir, libdrm, "libdrm.so.2")
-    ops.ln(dst_lib_dir, libdrm, "libdrm.so")
+    src_lib_dir = ops.path_join(install_tmp_dir, "usr/local/lib")
+    lib_so = "libdrm.so.2.4.0"
+    ops.copyto(ops.path_join(src_lib_dir, lib_so), dst_lib_dir)
+    ops.ln(dst_lib_dir, lib_so, "libdrm.so.2.4")
+    ops.ln(dst_lib_dir, lib_so, "libdrm.so.2")
+    ops.ln(dst_lib_dir, lib_so, "libdrm.so")
 
-    libkms = "libkms.so.1.0.0"
-    ops.copyto(ops.path_join(install_tmp_dir, "usr/local/lib/" + libkms), dst_lib_dir)
-    ops.ln(dst_lib_dir, libkms, "libkms.so.1.0")
-    ops.ln(dst_lib_dir, libkms, "libkms.so.1")
-    ops.ln(dst_lib_dir, libkms, "libkms.so")
+    lib_so = "libkms.so.1.0.0"
+    ops.copyto(ops.path_join(src_lib_dir, lib_so), dst_lib_dir)
+    ops.ln(dst_lib_dir, lib_so, "libkms.so.1.0")
+    ops.ln(dst_lib_dir, lib_so, "libkms.so.1")
+    ops.ln(dst_lib_dir, lib_so, "libkms.so")
 
-    libdrm_amdgpu = "libdrm_amdgpu.so.1.0.0"
-    ops.copyto(ops.path_join(install_tmp_dir, "usr/local/lib/" + libdrm_amdgpu), dst_lib_dir)
-    ops.ln(dst_lib_dir, libdrm_amdgpu, "libdrm_amdgpu.so.1.0")
-    ops.ln(dst_lib_dir, libdrm_amdgpu, "libdrm_amdgpu.so.1")
-    ops.ln(dst_lib_dir, libdrm_amdgpu, "libdrm_amdgpu.so")
+    lib_so = "libdrm_amdgpu.so.1.0.0"
+    if ops.isExist(ops.path_join(src_lib_dir, lib_so)) :
+        ops.copyto(ops.path_join(src_lib_dir, lib_so), dst_lib_dir)
+        ops.ln(dst_lib_dir, lib_so, "libdrm_amdgpu.so.1.0")
+        ops.ln(dst_lib_dir, lib_so, "libdrm_amdgpu.so.1")
+        ops.ln(dst_lib_dir, lib_so, "libdrm_amdgpu.so")
 
-    libdrm_freedreno = "libdrm_freedreno.so.1.0.0"
-    ops.copyto(ops.path_join(install_tmp_dir, "usr/local/lib/" + libdrm_freedreno), dst_lib_dir)
-    ops.ln(dst_lib_dir, libdrm_freedreno, "libdrm_freedreno.so.1.0")
-    ops.ln(dst_lib_dir, libdrm_freedreno, "libdrm_freedreno.so.1")
-    ops.ln(dst_lib_dir, libdrm_freedreno, "libdrm_freedreno.so")
+    lib_so = "libdrm_freedreno.so.1.0.0"
+    if ops.isExist(ops.path_join(src_lib_dir, lib_so)) :
+        ops.copyto(ops.path_join(src_lib_dir, lib_so), dst_lib_dir)
+        ops.ln(dst_lib_dir, lib_so, "libdrm_freedreno.so.1.0")
+        ops.ln(dst_lib_dir, lib_so, "libdrm_freedreno.so.1")
+        ops.ln(dst_lib_dir, lib_so, "libdrm_freedreno.so")
 
-    libdrm_intel = "libdrm_intel.so.1.0.0"
-    ops.copyto(ops.path_join(install_tmp_dir, "usr/local/lib/" + libdrm_intel), dst_lib_dir)
-    ops.ln(dst_lib_dir, libdrm_intel, "libdrm_intel.so.1.0")
-    ops.ln(dst_lib_dir, libdrm_intel, "libdrm_intel.so.1")
-    ops.ln(dst_lib_dir, libdrm_intel, "libdrm_intel.so")
+    lib_so = "libdrm_intel.so.1.0.0"
+    if ops.isExist(ops.path_join(src_lib_dir, lib_so)) :
+        ops.copyto(ops.path_join(src_lib_dir, lib_so), dst_lib_dir)
+        ops.ln(dst_lib_dir, lib_so, "libdrm_intel.so.1.0")
+        ops.ln(dst_lib_dir, lib_so, "libdrm_intel.so.1")
+        ops.ln(dst_lib_dir, lib_so, "libdrm_intel.so")
 
-    libdrm_nouveau = "libdrm_nouveau.so.2.0.0"
-    ops.copyto(ops.path_join(install_tmp_dir, "usr/local/lib/" + libdrm_nouveau), dst_lib_dir)
-    ops.ln(dst_lib_dir, libdrm_nouveau, "libdrm_nouveau.so.2.0")
-    ops.ln(dst_lib_dir, libdrm_nouveau, "libdrm_nouveau.so.2")
-    ops.ln(dst_lib_dir, libdrm_nouveau, "libdrm_nouveau.so")
+    lib_so = "libdrm_nouveau.so.2.0.0"
+    if ops.isExist(ops.path_join(src_lib_dir, lib_so)) :
+        ops.copyto(ops.path_join(src_lib_dir, lib_so), dst_lib_dir)
+        ops.ln(dst_lib_dir, lib_so, "libdrm_nouveau.so.2.0")
+        ops.ln(dst_lib_dir, lib_so, "libdrm_nouveau.so.2")
+        ops.ln(dst_lib_dir, lib_so, "libdrm_nouveau.so")
 
-    libdrm_radeon = "libdrm_radeon.so.1.0.1"
-    ops.copyto(ops.path_join(install_tmp_dir, "usr/local/lib/" + libdrm_radeon), dst_lib_dir)
-    ops.ln(dst_lib_dir, libdrm_radeon, "libdrm_radeon.so.1.0")
-    ops.ln(dst_lib_dir, libdrm_radeon, "libdrm_radeon.so.1")
-    ops.ln(dst_lib_dir, libdrm_radeon, "libdrm_radeon.so")
+    lib_so = "libdrm_radeon.so.1.0.1"
+    if ops.isExist(ops.path_join(src_lib_dir, lib_so)) :
+        ops.copyto(ops.path_join(src_lib_dir, lib_so), dst_lib_dir)
+        ops.ln(dst_lib_dir, lib_so, "libdrm_radeon.so.1.0")
+        ops.ln(dst_lib_dir, lib_so, "libdrm_radeon.so.1")
+        ops.ln(dst_lib_dir, lib_so, "libdrm_radeon.so")
 
     ops.mkdir(tmp_include_dir)
     ops.copyto(ops.path_join(install_tmp_dir, "usr/local/include/."), tmp_include_dir)
@@ -195,9 +222,18 @@ def MAIN_SDKENV(args):
     iopc.add_includes(cflags)
 
     libs = ""
-    libs += " -ldrm -lkms -ldrm_amdgpu -ldrm_freedreno -ldrm_intel -ldrm_nouveau -ldrm_radeon"
+    libs += " -ldrm -lkms"
+    if selected_platform_panda :
+        libs += " "
+    if selected_platform_j3455 :
+        libs += " -ldrm_amdgpu -ldrm_freedreno -ldrm_intel -ldrm_nouveau -ldrm_radeon"
     iopc.add_libs(libs)
 
+    return False
+
+def MAIN_DEPS(args):
+    # platform - panda
+    # platform - j3455
     return False
 
 def MAIN_CLEAN_BUILD(args):
